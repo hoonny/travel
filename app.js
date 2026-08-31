@@ -96,8 +96,71 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const fmtDist = (m) =>
   m >= 1000 ? (m / 1000).toFixed(1) + "km" : Math.round(m) + "m";
 
-/* OSRM 무료 라우팅 (실패 시 null → 직선 폴백) */
-async function fetchRoute(a, b) {
+/* Valhalla 인코딩 폴리라인(정밀도 6) 디코더 */
+function decodeShape(str, precision) {
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+  const coords = [];
+  const factor = Math.pow(10, precision || 6);
+  while (index < str.length) {
+    let shift = 0;
+    let result = 0;
+    let byte;
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0;
+    result = 0;
+    do {
+      byte = str.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    coords.push([lat / factor, lng / factor]);
+  }
+  return coords;
+}
+
+/* Valhalla (FOSSGIS) — 도보/차량 실제 경로 */
+async function fetchValhalla(a, b, costing) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 6500);
+  try {
+    const body = {
+      locations: [
+        { lat: a.lat, lon: a.lng },
+        { lat: b.lat, lon: b.lng },
+      ],
+      costing,
+      directions_options: { units: "kilometers" },
+    };
+    const url =
+      "https://valhalla1.openstreetmap.de/route?json=" +
+      encodeURIComponent(JSON.stringify(body));
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(t);
+    const j = await res.json();
+    const leg = j && j.trip && j.trip.legs && j.trip.legs[0];
+    if (leg && leg.shape) {
+      return {
+        pts: decodeShape(leg.shape, 6),
+        dist: j.trip.summary.length * 1000,
+        dur: j.trip.summary.time,
+      };
+    }
+  } catch (_) {
+    clearTimeout(t);
+  }
+  return null;
+}
+
+/* OSRM (차량) 폴백 */
+async function fetchOSRM(a, b) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 4500);
   try {
@@ -122,11 +185,26 @@ async function fetchRoute(a, b) {
   return null;
 }
 
+/* 이동 수단 자동 선택 후 경로 조회 */
+async function fetchRoute(a, b) {
+  const straight = a.distanceTo(b);
+  const walk = straight < 1300;
+  const v = await fetchValhalla(a, b, walk ? "pedestrian" : "auto");
+  if (v) return { ...v, mode: walk ? "walk" : "car" };
+  const o = await fetchOSRM(a, b);
+  if (o) return { ...o, mode: walk ? "walk" : "car" };
+  return null;
+}
+
 /* 경로 위를 이동하는 아이콘 애니메이션 */
-function animateAlong(pts) {
+function animateAlong(pts, mode) {
   if (moverRAF) cancelAnimationFrame(moverRAF);
   const mover = L.marker(pts[0], {
-    icon: L.divIcon({ className: "mover", html: "🚕", iconSize: [24, 24] }),
+    icon: L.divIcon({
+      className: "mover",
+      html: mode === "car" ? "🚕" : "🚶",
+      iconSize: [24, 24],
+    }),
     interactive: false,
     keyboard: false,
   }).addTo(legLayer);
@@ -165,22 +243,32 @@ function animateAlong(pts) {
 }
 
 /* 카드 → 다음 장소까지 경로 표시 */
+let legToken = 0;
 async function showLeg(mi) {
   if (!lmap || !markers[mi] || !markers[mi + 1]) return;
+  const my = ++legToken;
   openMapPanel();
   clearLeg();
+  legInfo.textContent = "경로 찾는 중…";
+  legInfo.hidden = false;
 
   const A = markers[mi].getLatLng();
   const B = markers[mi + 1].getLatLng();
   await sleep(300);
+  if (my !== legToken) return;
   lmap.invalidateSize();
 
   const r = await fetchRoute(A, B);
+  if (my !== legToken) return;
   let pts;
   let label;
+  let mode = "walk";
   if (r) {
     pts = r.pts;
-    label = `🚕 도로 ${fmtDist(r.dist)} · 약 ${Math.max(
+    mode = r.mode;
+    const icon = mode === "car" ? "🚕" : "🚶";
+    const word = mode === "car" ? "차량" : "걷기";
+    label = `${icon} ${word} ${fmtDist(r.dist)} · 약 ${Math.max(
       1,
       Math.round(r.dur / 60)
     )}분`;
@@ -189,7 +277,7 @@ async function showLeg(mi) {
       [A.lat, A.lng],
       [B.lat, B.lng],
     ];
-    label = `📏 직선거리 ${fmtDist(lmap.distance(A, B))}`;
+    label = `📏 직선거리 ${fmtDist(A.distanceTo(B))}`;
   }
 
   L.polyline(pts, {
@@ -217,7 +305,7 @@ async function showLeg(mi) {
   lmap.fitBounds(L.latLngBounds(pts).pad(0.15), { maxZoom: 16 });
   legInfo.textContent = label;
   legInfo.hidden = false;
-  animateAlong(pts);
+  animateAlong(pts, mode);
 }
 
 function pinIcon(n, cat) {
