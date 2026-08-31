@@ -1,3 +1,23 @@
+/* ===== 웹폰트 =====
+ * 한글 → 온글잎 박다현체 / 숫자·영문·기호 → Cafe24 Ssurround
+ * 같은 family("AppFont")에 unicode-range로 분리 지정
+ */
+@font-face {
+  font-family: "AppFont";
+  src: url("./webfonts/Cafe24Ssurround.woff2?v=10") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20A0-20BF,
+    U+2100-2131, U+2190-21FF, U+2200-22FF, U+2460-24FF, U+25A0-25FF;
+}
+@font-face {
+  font-family: "AppFont";
+  src: url("./webfonts/OnglipParkDahyun.woff2?v=10") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+  unicode-range: U+1100-11FF, U+3000-303F, U+3130-318F, U+AC00-D7A3;
+}
+
 :root {
   --bg: #eef1f4;
   --card: #ffffff;
@@ -26,12 +46,12 @@ body {
 }
 
 body {
-  font-family: "Pretendard Variable", Pretendard, -apple-system,
+  font-family: "AppFont", "Pretendard Variable", Pretendard, -apple-system,
     BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic",
     sans-serif;
   color: var(--text);
-  line-height: 1.5;
-  letter-spacing: -0.01em;
+  line-height: 1.58;
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
 }
 
