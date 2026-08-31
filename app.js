@@ -26,6 +26,51 @@ const esc = (s) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
   );
 
+/* ===== 도장깨기(스탬프) 상태 ===== */
+const STAMP_KEY = "shx_stamps";
+let stamps = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(STAMP_KEY) || "{}");
+  } catch (_) {
+    return {};
+  }
+})();
+function saveStamps() {
+  try {
+    localStorage.setItem(STAMP_KEY, JSON.stringify(stamps));
+  } catch (_) {}
+}
+const stampId = (dayIdx, it) => `${dayIdx}::${it.title}`;
+const realItems = (d) => d.items.filter((i) => i.type !== "note");
+let curDay = 0;
+
+function overallPct() {
+  let total = 0;
+  let done = 0;
+  DAYS.forEach((d, di) => {
+    realItems(d).forEach((it) => {
+      total += 1;
+      if (stamps[stampId(di, it)]) done += 1;
+    });
+  });
+  return total ? Math.round((done / total) * 100) : 0;
+}
+
+function sealSVG(c) {
+  return `<svg viewBox="0 0 80 80" aria-hidden="true">
+    <circle cx="40" cy="40" r="37" fill="#fff" stroke="#e0323c" stroke-width="3"/>
+    <circle cx="40" cy="40" r="30.5" fill="none" stroke="#e0323c" stroke-width="1.4"/>
+    <text x="40" y="35" text-anchor="middle" font-size="21">${c.icon}</text>
+    <text x="40" y="55" text-anchor="middle" font-size="12" font-weight="800" fill="#e0323c">완료</text>
+  </svg>`;
+}
+const hhmm = (ts) => {
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes()
+  ).padStart(2, "0")}`;
+};
+
 /* ---------- 상단 동선 지도 (Leaflet) ---------- */
 let lmap = null;
 let routeLayer = null;
@@ -93,9 +138,8 @@ function openMapPanel() {
   }
 }
 
-/* 리스트에서 특정 마커 카드로 스크롤 (고정 헤더/지도 높이만큼 보정) */
-function scrollToCard(mi) {
-  const card = app.querySelector(`.card[data-mi="${mi}"]`);
+/* 카드로 스크롤 (고정 헤더/지도 높이만큼 보정) + 잠깐 하이라이트 */
+function scrollToCardEl(card) {
   if (!card) return;
   const item = card.closest(".item") || card;
   const chrome =
@@ -107,6 +151,9 @@ function scrollToCard(mi) {
   window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
   card.classList.add("flash");
   setTimeout(() => card.classList.remove("flash"), 1400);
+}
+function scrollToCard(mi) {
+  scrollToCardEl(app.querySelector(`.card[data-mi="${mi}"]`));
 }
 
 function clearLeg() {
@@ -416,7 +463,7 @@ function childHTML(k) {
   </div>`;
 }
 
-function itemHTML(it, mi, nextTitle) {
+function itemHTML(dayIdx, it, mi, nextTitle) {
   if (it.type === "note") {
     return `<div class="item">
       <div class="rail"><span class="dot" style="--accent:${CAT.note.color}"></span></div>
@@ -449,11 +496,19 @@ function itemHTML(it, mi, nextTitle) {
       )}</b> →</button>`
     : "";
 
+  const sid = stampId(dayIdx, it);
+  const doneAt = stamps[sid];
+  const doneLine = doneAt
+    ? `<div class="done-at">✓ ${hhmm(doneAt)} 도장 완료</div>`
+    : "";
+
   return `<div class="item">
     <div class="rail"><span class="dot" style="--accent:${c.color}"></span></div>
     <div class="body" style="--accent:${c.color}">
       <div class="time">${esc(it.time || "")}</div>
-      <div class="card${hasLoc ? " has-loc" : ""}" style="--accent:${c.color}"${
+      <div class="card${hasLoc ? " has-loc" : ""}${
+    doneAt ? " done" : ""
+  }" style="--accent:${c.color}" data-stamp="${esc(sid)}"${
     hasLoc ? ` data-mi="${mi}"` : ""
   }>
         <span class="badge">${badgeNum}${c.icon} ${c.label}</span>
@@ -465,12 +520,18 @@ function itemHTML(it, mi, nextTitle) {
         ${kids}
         ${jump}
         ${leg}
+        <button type="button" class="stamp-btn" data-stampbtn="${esc(
+          sid
+        )}">🧧 도장 찍기</button>
+        ${doneLine}
+        <div class="stamp-seal">${sealSVG(c)}</div>
       </div>
     </div>
   </div>`;
 }
 
 function renderDay(idx) {
+  curDay = idx;
   const d = DAYS[idx];
   const real = d.items.filter((i) => i.type !== "note");
   const llItems = d.items.filter((i) => Array.isArray(i.ll));
@@ -478,26 +539,129 @@ function renderDay(idx) {
   let n = -1;
   const rows = d.items
     .map((it) => {
-      if (!Array.isArray(it.ll)) return itemHTML(it, -1, null);
+      if (!Array.isArray(it.ll)) return itemHTML(idx, it, -1, null);
       n += 1;
       const next = llItems[n + 1] ? llItems[n + 1].title : null;
-      return itemHTML(it, n, next);
+      return itemHTML(idx, it, n, next);
     })
     .join("");
 
   app.innerHTML = `
     <div class="day-head">
       <h2>${esc(d.title)} <span>${esc(d.dow)}</span></h2>
-      <span>${real.length}개 일정 · 지도 마커 ${llItems.length}곳 · 카드를 누르면 지도 이동</span>
+      <span>${real.length}개 일정 · 지도 마커 ${llItems.length}곳</span>
     </div>
+    <section class="stamp-board" id="stampBoard"></section>
     ${rows}
   `;
+
+  renderBoard(idx);
 
   [...tabs.children].forEach((b, i) => b.classList.toggle("active", i === idx));
   tabs.children[idx]?.scrollIntoView({ inline: "center", block: "nearest" });
   window.scrollTo(0, 0);
 
   drawRoute(idx);
+}
+
+/* ===== 오늘의 스탬프 보드 ===== */
+function renderBoard(idx) {
+  const board = document.getElementById("stampBoard");
+  if (!board) return;
+  const items = realItems(DAYS[idx]);
+  const done = items.filter((it) => stamps[stampId(idx, it)]).length;
+  const pct = items.length ? Math.round((done / items.length) * 100) : 0;
+
+  const slots = items
+    .map((it) => {
+      const id = stampId(idx, it);
+      const on = !!stamps[id];
+      const c = CAT[it.cat] || CAT.note;
+      return `<button type="button" class="sb-slot${
+        on ? " on" : ""
+      }" data-goto="${esc(id)}" style="--accent:${c.color}" title="${esc(
+        it.title
+      )}">${on ? c.icon : ""}</button>`;
+    })
+    .join("");
+
+  board.innerHTML = `
+    <div class="sb-head">
+      <b>🗺️ 오늘의 도장</b>
+      <span>${done}/${items.length} · 전체 ${overallPct()}%</span>
+    </div>
+    <div class="sb-rack">${slots}</div>
+    <div class="sb-bar"><i style="width:${pct}%"></i></div>
+  `;
+}
+
+function dayComplete(idx) {
+  const items = realItems(DAYS[idx]);
+  return items.length > 0 && items.every((it) => stamps[stampId(idx, it)]);
+}
+
+/* 도장 애니메이션 */
+function punch(cardEl) {
+  const seal = cardEl.querySelector(".stamp-seal");
+  if (seal) {
+    seal.classList.remove("punch");
+    void seal.offsetWidth;
+    seal.classList.add("punch");
+  }
+  cardEl.classList.remove("shake");
+  void cardEl.offsetWidth;
+  cardEl.classList.add("shake");
+  setTimeout(() => cardEl.classList.remove("shake"), 480);
+}
+
+function toggleStamp(id, cardEl) {
+  const nowDone = !stamps[id];
+  if (nowDone) stamps[id] = Date.now();
+  else delete stamps[id];
+  saveStamps();
+
+  cardEl.classList.toggle("done", nowDone);
+  const at = cardEl.querySelector(".done-at");
+  if (nowDone) {
+    if (!at) {
+      const seal = cardEl.querySelector(".stamp-seal");
+      const div = document.createElement("div");
+      div.className = "done-at";
+      div.textContent = `✓ ${hhmm(stamps[id])} 도장 완료`;
+      cardEl.insertBefore(div, seal);
+    }
+    punch(cardEl);
+  } else if (at) {
+    at.remove();
+  }
+
+  renderBoard(curDay);
+  if (nowDone && dayComplete(curDay)) celebrate(curDay);
+}
+
+/* Day 완주 축하 */
+function celebrate(idx) {
+  const toast = document.createElement("div");
+  toast.className = "day-toast";
+  toast.textContent = `Day ${idx + 1} 완주! 🎉 오늘 도장 올클리어`;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 2600);
+
+  const wrap = document.createElement("div");
+  wrap.className = "confetti-wrap";
+  const colors = ["#ff8fab", "#2b7fff", "#12b886", "#ffb703", "#7c5cff", "#e0323c"];
+  for (let i = 0; i < 90; i++) {
+    const p = document.createElement("i");
+    p.className = "confetti";
+    p.style.left = Math.random() * 100 + "vw";
+    p.style.background = colors[i % colors.length];
+    p.style.animationDelay = Math.random() * 0.5 + "s";
+    p.style.animationDuration = 1.6 + Math.random() * 1.4 + "s";
+    p.style.transform = `rotate(${Math.random() * 360}deg)`;
+    wrap.appendChild(p);
+  }
+  document.body.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 3400);
 }
 
 /* ---------- init ---------- */
@@ -524,14 +688,40 @@ function focusOnMap(mi) {
 }
 
 app.addEventListener("click", (e) => {
+  // 1) 도장 찍기 버튼
+  const sBtn = e.target.closest(".stamp-btn");
+  if (sBtn) {
+    toggleStamp(sBtn.dataset.stampbtn, sBtn.closest(".card"));
+    return;
+  }
+  // 2) 완료 도장(seal) 탭 → 도장 취소
+  const seal = e.target.closest(".card.done .stamp-seal");
+  if (seal) {
+    const c = seal.closest(".card");
+    toggleStamp(c.dataset.stamp, c);
+    return;
+  }
+  // 3) 스탬프 보드 슬롯 → 해당 카드로 스크롤
+  const slot = e.target.closest(".sb-slot");
+  if (slot) {
+    scrollToCardEl(
+      app.querySelector(`.card[data-stamp="${cssEsc(slot.dataset.goto)}"]`)
+    );
+    return;
+  }
+  // 4) 다음 장소 이동
   const legBtn = e.target.closest(".leg-btn");
   if (legBtn) {
     showLeg(Number(legBtn.dataset.leg));
     return;
   }
+  // 5) 카드 탭 → 지도에서 위치 보기
   const card = e.target.closest(".card.has-loc");
   if (card) focusOnMap(Number(card.dataset.mi));
 });
+
+const cssEsc = (s) =>
+  window.CSS && CSS.escape ? CSS.escape(s) : String(s).replace(/"/g, '\\"');
 
 /* 지도 접기/펼치기 */
 function applyCollapsed(collapsed) {
