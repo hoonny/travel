@@ -25,20 +25,10 @@ const esc = (s) =>
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])
   );
 
-/* ---------- 구글지도 열기 (앱 설치 시 앱, 아니면 웹) ---------- */
-function openMap(query) {
-  if (!query) return;
-  const q = encodeURIComponent(query);
-  window.open(
-    `https://www.google.com/maps/search/?api=1&query=${q}`,
-    "_blank",
-    "noopener"
-  );
-}
-
-/* ---------- 상단 동선 지도 (Leaflet + OSM) ---------- */
+/* ---------- 상단 동선 지도 (Leaflet) ---------- */
 let lmap = null;
 let routeLayer = null;
+let markers = [];
 
 function refreshMap() {
   if (lmap) lmap.invalidateSize();
@@ -76,12 +66,6 @@ function initMap() {
   });
 
   routeLayer = L.layerGroup().addTo(lmap);
-
-  lmap.on("popupopen", (e) => {
-    const btn = e.popup._contentNode.querySelector("[data-q]");
-    if (btn)
-      btn.onclick = () => openMap(decodeURIComponent(btn.dataset.q));
-  });
 }
 
 function pinIcon(n, color) {
@@ -94,34 +78,30 @@ function pinIcon(n, color) {
   });
 }
 
-function popupHTML(p) {
+function popupHTML(p, n) {
   return `<div class="mp-pop">
-    <b>${esc(p.title)}</b>
+    <b>${n}. ${esc(p.title)}</b>
     ${p.ko ? `<span>${esc(p.ko)}</span>` : ""}
-    ${
-      p.map
-        ? `<button class="pop-map" data-q="${esc(
-            encodeURIComponent(p.map)
-          )}">구글지도에서 열기</button>`
-        : ""
-    }
+    ${p.time ? `<span>${esc(p.time)}</span>` : ""}
   </div>`;
 }
 
 function drawRoute(dayIdx) {
   if (!lmap) return;
   routeLayer.clearLayers();
+  markers = [];
 
   const pts = DAYS[dayIdx].items.filter((i) => Array.isArray(i.ll));
   const coords = pts.map((p) => p.ll);
 
   pts.forEach((p, i) => {
-    L.marker(p.ll, {
+    const m = L.marker(p.ll, {
       icon: pinIcon(i + 1, (CAT[p.cat] || CAT.note).color),
       title: p.title,
     })
-      .bindPopup(popupHTML(p))
+      .bindPopup(popupHTML(p, i + 1))
       .addTo(routeLayer);
+    markers.push(m);
   });
 
   if (coords.length > 1) {
@@ -148,25 +128,11 @@ function drawRoute(dayIdx) {
 }
 
 /* ---------- 일정 리스트 렌더 ---------- */
-function mapButton(query) {
-  if (!query) return "";
-  return `<div class="actions"><button class="btn-map" data-q="${esc(
-    encodeURIComponent(query)
-  )}">${PIN}<span>구글지도에서 열기</span></button></div>`;
-}
-
 function childHTML(k) {
   return `<div class="child">
     <h4>${esc(k.title)}</h4>
     ${k.ko ? `<div class="ko">${esc(k.ko)}</div>` : ""}
     ${k.desc ? `<div class="desc">${esc(k.desc)}</div>` : ""}
-    ${
-      k.map
-        ? `<button class="mini-map" data-q="${esc(
-            encodeURIComponent(k.map)
-          )}">${PIN}<span>지도</span></button>`
-        : ""
-    }
   </div>`;
 }
 
@@ -192,13 +158,19 @@ function itemHTML(it, num) {
   const kids = it.children?.length
     ? `<div class="children">${it.children.map(childHTML).join("")}</div>`
     : "";
-  const badgeNum = num ? `<span class="badge-num">${num}</span> ` : "";
+  const hasLoc = num > 0;
+  const badgeNum = hasLoc ? `<span class="badge-num">${num}</span> ` : "";
+  const jump = hasLoc
+    ? `<div class="map-jump">${PIN}<span>지도에서 위치 보기</span></div>`
+    : "";
 
   return `<div class="item">
     <div class="rail"><span class="dot" style="--accent:${c.color}"></span></div>
     <div class="body" style="--accent:${c.color}">
       <div class="time">${esc(it.time || "")}</div>
-      <div class="card" style="--accent:${c.color}">
+      <div class="card${hasLoc ? " has-loc" : ""}" style="--accent:${c.color}"${
+    hasLoc ? ` data-mi="${num - 1}"` : ""
+  }>
         <span class="badge">${badgeNum}${c.icon} ${c.label}</span>
         <h3>${esc(it.title)}</h3>
         ${it.ko ? `<div class="ko">${esc(it.ko)}</div>` : ""}
@@ -206,7 +178,7 @@ function itemHTML(it, num) {
         ${tips}
         ${addr}
         ${kids}
-        ${mapButton(it.map)}
+        ${jump}
       </div>
     </div>
   </div>`;
@@ -215,7 +187,6 @@ function itemHTML(it, num) {
 function renderDay(idx) {
   const d = DAYS[idx];
   const real = d.items.filter((i) => i.type !== "note");
-  const spots = real.filter((i) => i.map).length;
 
   let n = 0;
   const rows = d.items
@@ -225,7 +196,7 @@ function renderDay(idx) {
   app.innerHTML = `
     <div class="day-head">
       <h2>${esc(d.title)} <span>${esc(d.dow)}</span></h2>
-      <span>${real.length}개 일정 · 장소 ${spots}곳 · 지도 마커 ${n}개</span>
+      <span>${real.length}개 일정 · 지도 마커 ${n}곳 · 카드를 누르면 지도 이동</span>
     </div>
     ${rows}
   `;
@@ -247,10 +218,30 @@ DAYS.forEach((d, i) => {
   tabs.appendChild(b);
 });
 
+/* 카드 탭 → 위 지도에서 해당 위치로 확대 */
+function focusOnMap(mi) {
+  if (!lmap || !markers[mi]) return;
+
+  if (mapPanel.classList.contains("collapsed")) {
+    applyCollapsed(false);
+    try {
+      localStorage.setItem("shx_map2", "0");
+    } catch (_) {}
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  setTimeout(() => {
+    lmap.invalidateSize();
+    const m = markers[mi];
+    lmap.setView(m.getLatLng(), 16, { animate: true });
+    m.openPopup();
+  }, 280);
+}
+
 app.addEventListener("click", (e) => {
-  const el = e.target.closest("[data-q]");
-  if (!el) return;
-  openMap(decodeURIComponent(el.dataset.q));
+  const card = e.target.closest(".card.has-loc");
+  if (!card) return;
+  focusOnMap(Number(card.dataset.mi));
 });
 
 /* 지도 접기/펼치기 */

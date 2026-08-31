@@ -276,28 +276,29 @@ main {
   margin-top: 1px;
 }
 
-.actions {
+/* 위치 있는 카드 → 탭하면 지도 이동 */
+.card.has-loc {
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.card.has-loc:active {
+  transform: scale(0.99);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(17, 24, 39, 0.1);
+}
+.map-jump {
   margin-top: 12px;
-}
-.btn-map {
-  width: 100%;
-  display: inline-flex;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  background: var(--map);
-  color: #fff;
+  gap: 5px;
+  font-size: 12px;
   font-weight: 700;
-  font-size: 13px;
-  padding: 11px 12px;
-  border-radius: 12px;
+  color: var(--accent);
 }
-.btn-map:active {
-  opacity: 0.85;
-}
-.btn-map svg {
-  width: 15px;
-  height: 15px;
+.map-jump svg {
+  width: 13px;
+  height: 13px;
 }
 
 /* ---------- children ---------- */
@@ -324,19 +325,6 @@ main {
   margin-top: 4px;
   font-size: 12.5px;
   color: #5b6572;
-}
-.mini-map {
-  margin-top: 9px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--map);
-}
-.mini-map svg {
-  width: 13px;
-  height: 13px;
 }
 
 /* ---------- note ---------- */
@@ -434,18 +422,6 @@ main {
   margin-top: 2px;
   font-size: 11.5px;
   color: var(--sub);
-}
-.pop-map {
-  margin-top: 9px;
-  width: 100%;
-  padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-  background: var(--map);
-  border: 0;
-  border-radius: 8px;
-  cursor: pointer;
 }
 
 /* ---------- footer ---------- */
