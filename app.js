@@ -74,7 +74,7 @@ function initMap() {
   legLayer = L.layerGroup().addTo(lmap);
 }
 
-/* 지도 패널 펼치고 위로 스크롤 */
+/* 지도 패널 펼치기 (지도는 sticky라 스크롤 점프 불필요) */
 function openMapPanel() {
   if (mapPanel.classList.contains("collapsed")) {
     applyCollapsed(false);
@@ -82,7 +82,27 @@ function openMapPanel() {
       localStorage.setItem("shx_map2", "0");
     } catch (_) {}
   }
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  // sticky가 안 먹는 예외 상황에서만 살짝 스크롤
+  const r = mapPanel.getBoundingClientRect();
+  if (r.bottom < 60 || r.top > window.innerHeight - 60) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+
+/* 리스트에서 특정 마커 카드로 스크롤 (고정 헤더/지도 높이만큼 보정) */
+function scrollToCard(mi) {
+  const card = app.querySelector(`.card[data-mi="${mi}"]`);
+  if (!card) return;
+  const item = card.closest(".item") || card;
+  const chrome =
+    document.querySelector(".app-header").offsetHeight +
+    document.querySelector(".day-tabs").offsetHeight +
+    mapPanel.offsetHeight +
+    12;
+  const top = item.getBoundingClientRect().top + window.scrollY - chrome;
+  window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  card.classList.add("flash");
+  setTimeout(() => card.classList.remove("flash"), 1400);
 }
 
 function clearLeg() {
@@ -197,7 +217,7 @@ async function fetchRoute(a, b) {
 }
 
 /* 경로 위를 이동하는 아이콘 애니메이션 */
-function animateAlong(pts, mode) {
+function animateAlong(pts, mode, onDone) {
   if (moverRAF) cancelAnimationFrame(moverRAF);
   const mover = L.marker(pts[0], {
     icon: L.divIcon({
@@ -236,8 +256,12 @@ function animateAlong(pts, mode) {
         pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f,
       ]);
     }
-    if (t < 1) moverRAF = requestAnimationFrame(step);
-    else moverRAF = null;
+    if (t < 1) {
+      moverRAF = requestAnimationFrame(step);
+    } else {
+      moverRAF = null;
+      if (onDone) onDone();
+    }
   };
   moverRAF = requestAnimationFrame(step);
 }
@@ -302,10 +326,12 @@ async function showLeg(mi) {
     fillOpacity: 1,
   }).addTo(legLayer);
 
-  lmap.fitBounds(L.latLngBounds(pts).pad(0.15), { maxZoom: 16 });
+  const straight = A.distanceTo(B);
+  const maxZ = straight < 500 ? 18 : straight < 1200 ? 17 : 16;
+  lmap.fitBounds(L.latLngBounds(pts).pad(0.12), { maxZoom: maxZ });
   legInfo.textContent = label;
   legInfo.hidden = false;
-  animateAlong(pts, mode);
+  animateAlong(pts, mode, () => scrollToCard(mi + 1));
 }
 
 function pinIcon(n, cat) {
