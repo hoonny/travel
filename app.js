@@ -42,9 +42,10 @@ function initMap() {
     return;
   }
   lmap = L.map("map", { zoomControl: true, attributionControl: true });
+  lmap.attributionControl.setPrefix(false);
 
   const primary = L.tileLayer(
-    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
     {
       subdomains: "abcd",
       maxZoom: 19,
@@ -68,13 +69,17 @@ function initMap() {
   routeLayer = L.layerGroup().addTo(lmap);
 }
 
-function pinIcon(n, color) {
+function pinIcon(n, cat) {
+  const c = CAT[cat] || CAT.note;
   return L.divIcon({
     className: "pin-wrap",
-    html: `<div class="pin" style="--c:${color}"><span>${n}</span></div>`,
-    iconSize: [26, 26],
-    iconAnchor: [13, 26],
-    popupAnchor: [0, -24],
+    html: `<div class="pin2" style="--c:${c.color}">
+      <span class="pin2-emoji">${c.icon}</span>
+      <span class="pin2-num">${n}</span>
+    </div>`,
+    iconSize: [40, 46],
+    iconAnchor: [20, 44],
+    popupAnchor: [0, -42],
   });
 }
 
@@ -96,20 +101,23 @@ function drawRoute(dayIdx) {
 
   pts.forEach((p, i) => {
     const m = L.marker(p.ll, {
-      icon: pinIcon(i + 1, (CAT[p.cat] || CAT.note).color),
+      icon: pinIcon(i + 1, p.cat),
       title: p.title,
+      riseOnHover: true,
     })
-      .bindPopup(popupHTML(p, i + 1))
+      .bindPopup(popupHTML(p, i + 1), { className: "cute-pop" })
       .addTo(routeLayer);
     markers.push(m);
   });
 
   if (coords.length > 1) {
     L.polyline(coords, {
-      color: "#2b7fff",
-      weight: 3,
-      opacity: 0.65,
-      dashArray: "6 7",
+      color: "#ff8fab",
+      weight: 4,
+      opacity: 0.85,
+      lineCap: "round",
+      lineJoin: "round",
+      dashArray: "1 12",
     }).addTo(routeLayer);
   }
 

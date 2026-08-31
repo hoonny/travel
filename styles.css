@@ -355,11 +355,12 @@ main {
   height: 240px;
   min-height: 240px;
   width: 100%;
-  border-radius: 14px;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: var(--shadow);
+  box-shadow: 0 6px 22px rgba(17, 24, 39, 0.12), 0 0 0 1px var(--line),
+    inset 0 0 0 3px #fff;
   transition: min-height 0.2s ease, height 0.2s ease;
-  background: #e5e7eb;
+  background: #eaf1f5;
 }
 .map-panel.collapsed #map {
   height: 0;
@@ -367,49 +368,112 @@ main {
   box-shadow: none;
 }
 .map-toggle {
-  width: 100%;
-  margin-top: 8px;
-  padding: 7px;
+  display: block;
+  margin: 9px auto 0;
+  padding: 6px 16px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--sub);
+  color: var(--primary);
   background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(17, 24, 39, 0.06);
 }
 .map-toggle:active {
-  background: var(--bg);
+  transform: scale(0.96);
 }
 
 .leaflet-container {
   font: inherit;
-  background: #e5e7eb;
+  background: #eaf1f5;
 }
-.leaflet-popup-content {
-  margin: 12px 14px;
+/* 타일을 살짝 파스텔톤으로 (타일 경계 seam 방지 위해 pane에 적용) */
+.leaflet-tile-pane {
+  filter: saturate(1.08) brightness(1.03);
 }
+
+/* 동글동글 지도 컨트롤 */
+.leaflet-bar {
+  border: 0 !important;
+  box-shadow: 0 3px 10px rgba(17, 24, 39, 0.18) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+.leaflet-bar a {
+  border-bottom-color: var(--line) !important;
+}
+
+/* 아기자기 핀 */
 .pin-wrap {
   background: none;
   border: 0;
 }
-.pin {
-  width: 26px;
-  height: 26px;
-  border-radius: 50% 50% 50% 0;
-  background: var(--c, #2b7fff);
-  border: 2px solid #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-  transform: rotate(-45deg);
+.pin2 {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--c, #2b7fff);
+  box-shadow: 0 5px 12px rgba(17, 24, 39, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: pin-pop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
-.pin span {
-  transform: rotate(45deg);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
+.pin2::after {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--c, #2b7fff);
+  border-bottom: 0;
+}
+.pin2-emoji {
+  font-size: 18px;
   line-height: 1;
+}
+.pin2-num {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: var(--c, #2b7fff);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+}
+@keyframes pin-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 말풍선 팝업 */
+.cute-pop .leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.2);
+  padding: 2px 4px;
+}
+.cute-pop .leaflet-popup-tip {
+  box-shadow: 0 8px 24px rgba(17, 24, 39, 0.12);
+}
+.leaflet-popup-content {
+  margin: 11px 14px;
 }
 .mp-pop b {
   display: block;
