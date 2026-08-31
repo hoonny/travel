@@ -1,4 +1,4 @@
-/* 상하이 여행 일정 웹앱 — 트리플 스타일 타임라인 + 구글지도 연동 */
+/* 상하이 여행 일정 웹앱 — 트리플 스타일 타임라인 + 상단 동선 지도 + 구글지도 연동 */
 
 const CAT = {
   food: { label: "맛집", icon: "🍽", color: "#ff7a00" },
@@ -16,6 +16,8 @@ const PIN =
 
 const app = document.getElementById("app");
 const tabs = document.getElementById("dayTabs");
+const mapPanel = document.getElementById("mapPanel");
+const mapToggle = document.getElementById("mapToggle");
 
 const esc = (s) =>
   String(s).replace(
@@ -27,11 +29,107 @@ const esc = (s) =>
 function openMap(query) {
   if (!query) return;
   const q = encodeURIComponent(query);
-  const url = `https://www.google.com/maps/search/?api=1&query=${q}`;
-  window.open(url, "_blank", "noopener");
+  window.open(
+    `https://www.google.com/maps/search/?api=1&query=${q}`,
+    "_blank",
+    "noopener"
+  );
 }
 
-/* ---------- 렌더 ---------- */
+/* ---------- 상단 동선 지도 (Leaflet + OSM) ---------- */
+let lmap = null;
+let routeLayer = null;
+
+function initMap() {
+  if (typeof L === "undefined") {
+    mapPanel.style.display = "none";
+    return;
+  }
+  lmap = L.map("map", { zoomControl: true, attributionControl: true });
+
+  const osm = L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { maxZoom: 19, attribution: "&copy; OpenStreetMap" }
+  ).addTo(lmap);
+
+  // 타일 에러가 반복되면 CARTO 타일로 1회 대체 (중국 접속 대비)
+  let errs = 0;
+  let swapped = false;
+  osm.on("tileerror", () => {
+    if (swapped || ++errs < 6) return;
+    swapped = true;
+    lmap.removeLayer(osm);
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+      { subdomains: "abcd", maxZoom: 19, attribution: "&copy; OSM &copy; CARTO" }
+    ).addTo(lmap);
+  });
+
+  routeLayer = L.layerGroup().addTo(lmap);
+
+  lmap.on("popupopen", (e) => {
+    const btn = e.popup._contentNode.querySelector("[data-q]");
+    if (btn)
+      btn.onclick = () => openMap(decodeURIComponent(btn.dataset.q));
+  });
+}
+
+function pinIcon(n, color) {
+  return L.divIcon({
+    className: "pin-wrap",
+    html: `<div class="pin" style="--c:${color}"><span>${n}</span></div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 26],
+    popupAnchor: [0, -24],
+  });
+}
+
+function popupHTML(p) {
+  return `<div class="mp-pop">
+    <b>${esc(p.title)}</b>
+    ${p.ko ? `<span>${esc(p.ko)}</span>` : ""}
+    ${
+      p.map
+        ? `<button class="pop-map" data-q="${esc(
+            encodeURIComponent(p.map)
+          )}">구글지도에서 열기</button>`
+        : ""
+    }
+  </div>`;
+}
+
+function drawRoute(dayIdx) {
+  if (!lmap) return;
+  routeLayer.clearLayers();
+
+  const pts = DAYS[dayIdx].items.filter((i) => Array.isArray(i.ll));
+  const coords = pts.map((p) => p.ll);
+
+  pts.forEach((p, i) => {
+    L.marker(p.ll, {
+      icon: pinIcon(i + 1, (CAT[p.cat] || CAT.note).color),
+      title: p.title,
+    })
+      .bindPopup(popupHTML(p))
+      .addTo(routeLayer);
+  });
+
+  if (coords.length > 1) {
+    L.polyline(coords, {
+      color: "#2b7fff",
+      weight: 3,
+      opacity: 0.65,
+      dashArray: "6 7",
+    }).addTo(routeLayer);
+    lmap.fitBounds(L.latLngBounds(coords), { padding: [34, 34], maxZoom: 15 });
+  } else if (coords.length === 1) {
+    lmap.setView(coords[0], 15);
+  }
+
+  setTimeout(() => lmap.invalidateSize(), 0);
+}
+
+/* ---------- 일정 리스트 렌더 ---------- */
 function mapButton(query) {
   if (!query) return "";
   return `<div class="actions"><button class="btn-map" data-q="${esc(
@@ -54,7 +152,7 @@ function childHTML(k) {
   </div>`;
 }
 
-function itemHTML(it) {
+function itemHTML(it, num) {
   if (it.type === "note") {
     return `<div class="item">
       <div class="rail"><span class="dot" style="--accent:${CAT.note.color}"></span></div>
@@ -76,13 +174,14 @@ function itemHTML(it) {
   const kids = it.children?.length
     ? `<div class="children">${it.children.map(childHTML).join("")}</div>`
     : "";
+  const badgeNum = num ? `<span class="badge-num">${num}</span> ` : "";
 
   return `<div class="item">
     <div class="rail"><span class="dot" style="--accent:${c.color}"></span></div>
     <div class="body" style="--accent:${c.color}">
       <div class="time">${esc(it.time || "")}</div>
       <div class="card" style="--accent:${c.color}">
-        <span class="badge">${c.icon} ${c.label}</span>
+        <span class="badge">${badgeNum}${c.icon} ${c.label}</span>
         <h3>${esc(it.title)}</h3>
         ${it.ko ? `<div class="ko">${esc(it.ko)}</div>` : ""}
         ${it.desc ? `<p class="desc">${esc(it.desc)}</p>` : ""}
@@ -100,17 +199,24 @@ function renderDay(idx) {
   const real = d.items.filter((i) => i.type !== "note");
   const spots = real.filter((i) => i.map).length;
 
+  let n = 0;
+  const rows = d.items
+    .map((it) => itemHTML(it, Array.isArray(it.ll) ? ++n : 0))
+    .join("");
+
   app.innerHTML = `
     <div class="day-head">
       <h2>${esc(d.title)} <span>${esc(d.dow)}</span></h2>
-      <span>${real.length}개 일정 · 장소 ${spots}곳</span>
+      <span>${real.length}개 일정 · 장소 ${spots}곳 · 지도 마커 ${n}개</span>
     </div>
-    ${d.items.map(itemHTML).join("")}
+    ${rows}
   `;
 
   [...tabs.children].forEach((b, i) => b.classList.toggle("active", i === idx));
   tabs.children[idx]?.scrollIntoView({ inline: "center", block: "nearest" });
   window.scrollTo(0, 0);
+
+  drawRoute(idx);
 }
 
 /* ---------- init ---------- */
@@ -129,11 +235,32 @@ app.addEventListener("click", (e) => {
   openMap(decodeURIComponent(el.dataset.q));
 });
 
+/* 지도 접기/펼치기 */
+function applyCollapsed(collapsed) {
+  mapPanel.classList.toggle("collapsed", collapsed);
+  mapToggle.textContent = collapsed ? "지도 펼치기 ▼" : "지도 접기 ▲";
+}
+mapToggle.addEventListener("click", () => {
+  const collapsed = !mapPanel.classList.contains("collapsed");
+  applyCollapsed(collapsed);
+  try {
+    localStorage.setItem("shx_mapCollapsed", collapsed ? "1" : "0");
+  } catch (_) {}
+  if (!collapsed && lmap) setTimeout(() => lmap.invalidateSize(), 220);
+});
+
 function syncOffsets() {
   const h = document.querySelector(".app-header").offsetHeight;
+  const t = document.querySelector(".day-tabs").offsetHeight;
   document.documentElement.style.setProperty("--hh", h + "px");
+  document.documentElement.style.setProperty("--th", t + "px");
 }
 window.addEventListener("resize", syncOffsets);
+window.addEventListener("resize", () => lmap && lmap.invalidateSize());
 
 syncOffsets();
+initMap();
+try {
+  applyCollapsed(localStorage.getItem("shx_mapCollapsed") === "1");
+} catch (_) {}
 renderDay(0);

@@ -14,6 +14,10 @@
   rel="stylesheet"
   href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
 />
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+/>
 <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -25,6 +29,11 @@
 
   <nav class="day-tabs" id="dayTabs" aria-label="여행 일자"></nav>
 
+  <section class="map-panel" id="mapPanel" aria-label="오늘 동선 지도">
+    <div id="map"></div>
+    <button class="map-toggle" id="mapToggle" type="button">지도 접기 ▲</button>
+  </section>
+
   <main id="app"></main>
 
   <footer>
@@ -32,6 +41,7 @@
   </footer>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="./data.js"></script>
 <script src="./app.js"></script>
 </body>
