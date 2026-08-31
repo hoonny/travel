@@ -585,6 +585,7 @@ function renderBoard(idx) {
     })
     .join("");
 
+  const anyStamp = Object.keys(stamps).length > 0;
   board.innerHTML = `
     <div class="sb-head">
       <b>🗺️ 오늘의 도장</b>
@@ -592,7 +593,27 @@ function renderBoard(idx) {
     </div>
     <div class="sb-rack">${slots}</div>
     <div class="sb-bar"><i style="width:${pct}%"></i></div>
+    ${
+      anyStamp
+        ? `<div class="sb-foot">
+             <button type="button" class="sb-reset" data-reset="day">오늘 도장 지우기</button>
+             <button type="button" class="sb-reset" data-reset="all">전체 초기화</button>
+           </div>`
+        : `<div class="sb-foot muted">여행 시작 전이에요 · 장소에 도착하면 도장을 찍어요</div>`
+    }
   `;
+}
+
+function resetStamps(scope) {
+  if (scope === "all") {
+    if (!confirm("찍은 도장을 전부 초기화할까요? 되돌릴 수 없어요.")) return;
+    stamps = {};
+  } else {
+    if (!confirm(`${DAYS[curDay].title} 도장을 지울까요?`)) return;
+    realItems(DAYS[curDay]).forEach((it) => delete stamps[stampId(curDay, it)]);
+  }
+  saveStamps();
+  renderDay(curDay);
 }
 
 function dayComplete(idx) {
@@ -699,6 +720,12 @@ app.addEventListener("click", (e) => {
   if (seal) {
     const c = seal.closest(".card");
     toggleStamp(c.dataset.stamp, c);
+    return;
+  }
+  // 2.5) 스탬프 초기화
+  const reset = e.target.closest(".sb-reset");
+  if (reset) {
+    resetStamps(reset.dataset.reset);
     return;
   }
   // 3) 스탬프 보드 슬롯 → 해당 카드로 스크롤
