@@ -2,6 +2,7 @@
  * cat: food | cafe | sight | shop | hotel | move | spa
  * map: 구글지도 검색 쿼리 (중국 POI라 중국어 상호명 기준)
  * ll : [위도, 경도] WGS-84 — 상단 지도 마커/경로용 (일부는 동네 기준 근사치)
+ * moveBy: 직전 장소에서 여기까지 오는 이동수단 walk|car|boat (없으면 거리로 추정)
  * type:'note' 는 지도 없는 메모 카드
  */
 const DAYS = [
@@ -22,6 +23,7 @@ const DAYS = [
       {
         time: "체크인",
         cat: "hotel",
+        moveBy: "walk",
         title: "다종 푸동 공항 호텔 (노스 빌딩)",
         ko: "上海大众空港宾馆",
         desc: "공항에서 도보 이동 가능한 거리.",
@@ -52,6 +54,7 @@ const DAYS = [
       {
         time: "~11:00",
         cat: "hotel",
+        moveBy: "car",
         title: "와우 이그제큐티브 호텔 · 짐 맡기기",
         ko: "上海万澳行政酒店 (南京东路店)",
         desc: "체크인은 오후 2시. 우선 짐만 맡기고 나오기. 이동 1시간 내외 예상.",
@@ -62,6 +65,7 @@ const DAYS = [
       {
         time: "11:00 – 12:00",
         cat: "food",
+        moveBy: "walk",
         title: "Yang's Fried Dumpling",
         ko: "양스 프라이드 덤플링 · 生煎包",
         desc: "바닥을 바삭하게 구운 만두 '성젠바오'. 프랜차이즈라 실패 없는 맛, 만두랑 국수.",
@@ -72,6 +76,7 @@ const DAYS = [
       {
         time: "12:00 – 14:00",
         cat: "sight",
+        moveBy: "walk",
         title: "난징동루 구경",
         ko: "南京东路步行街",
         desc: "번화가 쇼핑거리. 볼거리·살거리 많음.\n기념품은 오늘 미리미리 챙기기! (막날 시간 없음)",
@@ -96,6 +101,7 @@ const DAYS = [
       {
         time: "14:00",
         cat: "hotel",
+        moveBy: "walk",
         title: "숙소 체크인 후 예원으로",
         ko: "택시 10분",
         desc: "짐 찾아 체크인하고 예원 노거리로 이동.",
@@ -105,6 +111,7 @@ const DAYS = [
       {
         time: "14:00",
         cat: "sight",
+        moveBy: "car",
         title: "예원 노거리",
         ko: "豫园老街 · Yuyuan Old Street",
         desc: "먹거리와 기념품 골목.",
@@ -114,6 +121,7 @@ const DAYS = [
       {
         time: "14:30 – 15:30",
         cat: "sight",
+        moveBy: "walk",
         title: "예원 정원 내부 구경",
         ko: "豫园",
         desc: "유료 · 1인 약 3천원.",
@@ -124,6 +132,7 @@ const DAYS = [
       {
         time: "15:30 – 17:00",
         cat: "food",
+        moveBy: "walk",
         title: "남상만두점 샤오롱바오",
         ko: "南翔馒头店",
         desc: "빨대 꽂아 먹는 샤오롱바오. 1층은 포장, 2·3층은 식당. 웨이팅 있어도 금방 빠짐.",
@@ -133,6 +142,7 @@ const DAYS = [
       {
         time: "15:30 – 17:00",
         cat: "cafe",
+        moveBy: "walk",
         title: "차지티 (CHAGEE)",
         ko: "霸王茶姬 · 프리미엄 밀크티",
         desc: "백아절현(시그니처, 꽃향 밀크티), 화전우롱(복숭아+우롱).",
@@ -142,6 +152,7 @@ const DAYS = [
       {
         time: "17:00 – 19:00",
         cat: "food",
+        moveBy: "car",
         title: "성용싱 베이징덕",
         ko: "晟永兴 · Sheng Yong Xing · 미슐랭 1스타",
         desc: "베이징덕 미슐랭 1스타 맛집.",
@@ -152,6 +163,7 @@ const DAYS = [
       {
         time: "19:00 –",
         cat: "sight",
+        moveBy: "car",
         title: "와이탄 야경 + 커플 스냅",
         ko: "外滩",
         desc: "하절기 점등은 19:00쯤. 밥 먹고 넘어가 야경 감상.",
@@ -191,6 +203,7 @@ const DAYS = [
       {
         time: "08:30 – 08:40",
         cat: "sight",
+        moveBy: "car",
         title: "우캉맨션 도착",
         ko: "武康大楼",
         desc: "택시 20~30분 (출근시간이라 여유 있게). 가능하면 스냅 촬영.",
@@ -200,6 +213,7 @@ const DAYS = [
       {
         time: "09:30 – 10:30",
         cat: "sight",
+        moveBy: "walk",
         title: "우캉루 산책",
         ko: "武康路 · 프랑스 조계지",
         desc: "사실 점심 먹으러 걸어가는 길.",
@@ -209,6 +223,7 @@ const DAYS = [
       {
         time: "10:30 – 12:00",
         cat: "food",
+        moveBy: "walk",
         title: "建国328小馆",
         ko: "가정식",
         desc: "홍소육, 파기름 국수. 우캉맨션과 거리는 좀 있지만 가정식 후기가 좋음.",
@@ -218,6 +233,7 @@ const DAYS = [
       {
         time: "12:00 – 13:30",
         cat: "cafe",
+        moveBy: "walk",
         title: "RAC coffee & bar",
         ko: "크레페 맛집",
         desc: "갈 때 크게 돌아 프랑스 조계지 구경하며 소화. 카페에서 휴식.",
@@ -227,6 +243,7 @@ const DAYS = [
       {
         time: "13:30 – 14:00",
         cat: "move",
+        moveBy: "car",
         title: "택시로 임시정부 청사 이동",
         ko: "大韩民国临时政府旧址",
         desc: "입장료 1인 20위안, 현금 준비.",
@@ -236,6 +253,7 @@ const DAYS = [
       {
         time: "14:00 – 15:00",
         cat: "sight",
+        moveBy: "walk",
         title: "대한민국 임시정부 청사 관람",
         ko: "관람 40~50분 규모",
         desc: "",
@@ -245,6 +263,7 @@ const DAYS = [
       {
         time: "15:00 – 16:00",
         cat: "food",
+        moveBy: "walk",
         title: "점도덕 (点都德)",
         ko: "딤섬",
         desc: "金莎红米肠 홍미창펀(대표메뉴 무조건), 虾饺皇 하가우(새우만두 무조건).",
@@ -255,6 +274,7 @@ const DAYS = [
       {
         time: "16:00 – 17:00",
         cat: "shop",
+        moveBy: "walk",
         title: "신천지 구경",
         ko: "新天地 · Xintiandi Style",
         desc: "건축물·쇼핑센터 위주. 사실 저녁 양꼬치 배 만들려고 걷는 코스.",
@@ -264,6 +284,7 @@ const DAYS = [
       {
         time: "17:00 – 18:30",
         cat: "spa",
+        moveBy: "car",
         title: "도원향 발마사지",
         ko: "쑥통 발마사지 70분",
         desc: "신천지에서 차로 20분. 트립닷컴 17:00 예약 완료.",
@@ -273,6 +294,7 @@ const DAYS = [
       {
         time: "18:30 – 20:00",
         cat: "food",
+        moveBy: "car",
         title: "예리사리 (양꼬치)",
         ko: "耶里夏丽新疆餐厅 · 위구르 음식",
         desc: "羊肉串 양꼬치, 烤包子 카오바오즈(양고기 소 구운만두), 新疆酸奶 신장 요구르트. 양고기 스테이크는 별로라는 후기.",
@@ -282,6 +304,7 @@ const DAYS = [
       {
         time: "20:00 –",
         cat: "shop",
+        moveBy: "walk",
         title: "신세계백화점 (자유시간)",
         ko: "新世界城",
         desc: "식당 맞은편. 지하 1층 릴리안 베이커리 에그타르트 포장 (유명 맛집).",
@@ -313,6 +336,7 @@ const DAYS = [
       {
         time: "09:00 – 09:30",
         cat: "move",
+        moveBy: "boat",
         title: "방생교까지 배 이동",
         ko: "放生桥",
         desc: "1인 40위안, 방생교까지 약 20분.",
@@ -322,6 +346,7 @@ const DAYS = [
       {
         time: "09:30 – 10:30",
         cat: "food",
+        moveBy: "walk",
         title: "放生桥菜馆",
         ko: "방생교 뷰 식당",
         desc: "清蒸白水鱼(민물 흰살생선찜), 盐水河虾(민물새우), 扎肉(간장 돼지고기), 炒螺蛳(볶은 우렁이), 银鱼炒蛋(빙어+계란), 河蚌豆腐(민물조개 두부). 흰물고기·민물생선 꼭!",
@@ -332,6 +357,7 @@ const DAYS = [
       {
         time: "10:30 – 13:00",
         cat: "cafe",
+        moveBy: "walk",
         title: "魔嘟后花院",
         ko: "주자자오 뷰 카페",
         desc: "커피+케이크의 일반 베이커리 카페. 뷰맛집. 골목 산책 겸.",
@@ -341,6 +367,7 @@ const DAYS = [
       {
         time: "13:00 – 14:30",
         cat: "move",
+        moveBy: "car",
         title: "난징동루로 복귀",
         ko: "디디",
         desc: "주말 피크타임이라 여유롭게. 야경 예쁘지만 막날+인파로 빠른 탈출.",
@@ -350,6 +377,7 @@ const DAYS = [
       {
         time: "14:30 – 16:00",
         cat: "food",
+        moveBy: "walk",
         title: "위싱지 인민광장점",
         ko: "Yuxing Ji · 게살/게알 국수",
         desc: "호텔에서 도보 6분. 구글지도 주소 틀림 주의!",
@@ -360,6 +388,7 @@ const DAYS = [
       {
         time: "16:00 – 17:00",
         cat: "spa",
+        moveBy: "walk",
         title: "무스지 헤드스파",
         ko: "沐四季水循环养发·SPA (浦汇大厦店)",
         desc: "두피 스파.",
@@ -371,6 +400,7 @@ const DAYS = [
       {
         time: "17:00 – 19:00",
         cat: "food",
+        moveBy: "car",
         title: "진마오타워에서 저녁 + 야경",
         ko: "金茂大厦",
         desc: "56층 on56: 해산물 뷔페 (여기까지 먹으면 배 터짐) / 85층 Cloud9: 바 위주 레스토랑 — 여기 예약.",
@@ -402,6 +432,7 @@ const DAYS = [
       {
         time: "08:05",
         cat: "move",
+        moveBy: "car",
         title: "비행기 출발",
         ko: "상하이 푸동 → 인천",
         desc: "",

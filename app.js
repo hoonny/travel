@@ -31,7 +31,11 @@ let lmap = null;
 let routeLayer = null;
 let legLayer = null;
 let markers = [];
+let dayLL = [];
 let moverRAF = null;
+
+const MODE_ICON = { walk: "🚶", car: "🚕", boat: "⛴" };
+const MODE_WORD = { walk: "걷기", car: "차량", boat: "배" };
 
 function refreshMap() {
   if (lmap) lmap.invalidateSize();
@@ -205,14 +209,13 @@ async function fetchOSRM(a, b) {
   return null;
 }
 
-/* 이동 수단 자동 선택 후 경로 조회 */
-async function fetchRoute(a, b) {
-  const straight = a.distanceTo(b);
-  const walk = straight < 1300;
-  const v = await fetchValhalla(a, b, walk ? "pedestrian" : "auto");
-  if (v) return { ...v, mode: walk ? "walk" : "car" };
+/* 지정된 이동수단으로 경로 조회 (boat는 라우팅 없이 직선) */
+async function fetchRoute(a, b, mode) {
+  if (mode === "boat") return null;
+  const v = await fetchValhalla(a, b, mode === "walk" ? "pedestrian" : "auto");
+  if (v) return v;
   const o = await fetchOSRM(a, b);
-  if (o) return { ...o, mode: walk ? "walk" : "car" };
+  if (o) return o;
   return null;
 }
 
@@ -222,7 +225,7 @@ function animateAlong(pts, mode, onDone) {
   const mover = L.marker(pts[0], {
     icon: L.divIcon({
       className: "mover",
-      html: mode === "car" ? "🚕" : "🚶",
+      html: MODE_ICON[mode] || "🚶",
       iconSize: [24, 24],
     }),
     interactive: false,
@@ -278,20 +281,23 @@ async function showLeg(mi) {
 
   const A = markers[mi].getLatLng();
   const B = markers[mi + 1].getLatLng();
+  const straight = A.distanceTo(B);
+  const dest = dayLL[mi + 1] || {};
+  // 일정표에 적힌 이동수단 우선, 없으면 거리로 추정(900m 미만 도보)
+  const mode = dest.moveBy || (straight < 900 ? "walk" : "car");
+
   await sleep(300);
   if (my !== legToken) return;
   lmap.invalidateSize();
 
-  const r = await fetchRoute(A, B);
+  const r = await fetchRoute(A, B, mode);
   if (my !== legToken) return;
   let pts;
   let label;
-  let mode = "walk";
+  const icon = MODE_ICON[mode] || "🚶";
+  const word = MODE_WORD[mode] || "이동";
   if (r) {
     pts = r.pts;
-    mode = r.mode;
-    const icon = mode === "car" ? "🚕" : "🚶";
-    const word = mode === "car" ? "차량" : "걷기";
     label = `${icon} ${word} ${fmtDist(r.dist)} · 약 ${Math.max(
       1,
       Math.round(r.dur / 60)
@@ -301,7 +307,7 @@ async function showLeg(mi) {
       [A.lat, A.lng],
       [B.lat, B.lng],
     ];
-    label = `📏 직선거리 ${fmtDist(A.distanceTo(B))}`;
+    label = `${icon} ${word} · 직선거리 ${fmtDist(straight)}`;
   }
 
   L.polyline(pts, {
@@ -326,7 +332,6 @@ async function showLeg(mi) {
     fillOpacity: 1,
   }).addTo(legLayer);
 
-  const straight = A.distanceTo(B);
   const maxZ = straight < 500 ? 18 : straight < 1200 ? 17 : 16;
   lmap.fitBounds(L.latLngBounds(pts).pad(0.12), { maxZoom: maxZ });
   legInfo.textContent = label;
@@ -363,6 +368,7 @@ function drawRoute(dayIdx) {
   markers = [];
 
   const pts = DAYS[dayIdx].items.filter((i) => Array.isArray(i.ll));
+  dayLL = pts;
   const coords = pts.map((p) => p.ll);
 
   pts.forEach((p, i) => {
