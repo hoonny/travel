@@ -40,29 +40,39 @@ function openMap(query) {
 let lmap = null;
 let routeLayer = null;
 
+function refreshMap() {
+  if (lmap) lmap.invalidateSize();
+}
+
 function initMap() {
   if (typeof L === "undefined") {
-    mapPanel.style.display = "none";
+    document.getElementById("map").innerHTML =
+      '<div style="padding:24px;font-size:12px;color:#8b95a1;text-align:center">지도를 불러오지 못했어요.<br>네트워크 상태를 확인해 주세요.</div>';
+    mapToggle.style.display = "none";
     return;
   }
   lmap = L.map("map", { zoomControl: true, attributionControl: true });
 
-  const osm = L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    { maxZoom: 19, attribution: "&copy; OpenStreetMap" }
+  const primary = L.tileLayer(
+    "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    {
+      subdomains: "abcd",
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap &copy; CARTO",
+    }
   ).addTo(lmap);
 
-  // 타일 에러가 반복되면 CARTO 타일로 1회 대체 (중국 접속 대비)
+  // 기본 타일이 반복 실패하면 OSM 타일로 1회 대체
   let errs = 0;
   let swapped = false;
-  osm.on("tileerror", () => {
+  primary.on("tileerror", () => {
     if (swapped || ++errs < 6) return;
     swapped = true;
-    lmap.removeLayer(osm);
-    L.tileLayer(
-      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-      { subdomains: "abcd", maxZoom: 19, attribution: "&copy; OSM &copy; CARTO" }
-    ).addTo(lmap);
+    lmap.removeLayer(primary);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
+    }).addTo(lmap);
   });
 
   routeLayer = L.layerGroup().addTo(lmap);
@@ -121,12 +131,20 @@ function drawRoute(dayIdx) {
       opacity: 0.65,
       dashArray: "6 7",
     }).addTo(routeLayer);
-    lmap.fitBounds(L.latLngBounds(coords), { padding: [34, 34], maxZoom: 15 });
-  } else if (coords.length === 1) {
-    lmap.setView(coords[0], 15);
   }
 
-  setTimeout(() => lmap.invalidateSize(), 0);
+  const fit = () => {
+    lmap.invalidateSize();
+    if (coords.length > 1) {
+      lmap.fitBounds(L.latLngBounds(coords), { padding: [34, 34], maxZoom: 15 });
+    } else if (coords.length === 1) {
+      lmap.setView(coords[0], 15);
+    } else {
+      lmap.setView([31.23, 121.47], 12);
+    }
+  };
+  requestAnimationFrame(fit);
+  [120, 400, 900].forEach((ms) => setTimeout(fit, ms));
 }
 
 /* ---------- 일정 리스트 렌더 ---------- */
@@ -244,7 +262,7 @@ mapToggle.addEventListener("click", () => {
   const collapsed = !mapPanel.classList.contains("collapsed");
   applyCollapsed(collapsed);
   try {
-    localStorage.setItem("shx_mapCollapsed", collapsed ? "1" : "0");
+    localStorage.setItem("shx_map2", collapsed ? "1" : "0");
   } catch (_) {}
   if (!collapsed && lmap) setTimeout(() => lmap.invalidateSize(), 220);
 });
@@ -256,11 +274,13 @@ function syncOffsets() {
   document.documentElement.style.setProperty("--th", t + "px");
 }
 window.addEventListener("resize", syncOffsets);
-window.addEventListener("resize", () => lmap && lmap.invalidateSize());
+window.addEventListener("resize", refreshMap);
+window.addEventListener("load", () => setTimeout(refreshMap, 100));
 
 syncOffsets();
 initMap();
 try {
-  applyCollapsed(localStorage.getItem("shx_mapCollapsed") === "1");
+  applyCollapsed(localStorage.getItem("shx_map2") === "1");
 } catch (_) {}
 renderDay(0);
+[150, 500, 1200].forEach((ms) => setTimeout(refreshMap, ms));

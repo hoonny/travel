@@ -10,6 +10,7 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(17, 24, 39, 0.06);
   --maxw: 480px;
   --hh: 64px;
+  --th: 52px;
 }
 
 * {
@@ -363,15 +364,18 @@ main {
   padding: 8px 16px 4px;
 }
 #map {
-  height: 230px;
+  height: 240px;
+  min-height: 240px;
+  width: 100%;
   border-radius: 14px;
   overflow: hidden;
   box-shadow: var(--shadow);
-  transition: height 0.2s ease;
+  transition: min-height 0.2s ease, height 0.2s ease;
   background: #e5e7eb;
 }
 .map-panel.collapsed #map {
   height: 0;
+  min-height: 0;
   box-shadow: none;
 }
 .map-toggle {
