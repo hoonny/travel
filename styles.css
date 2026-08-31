@@ -4,7 +4,7 @@
  */
 @font-face {
   font-family: "AppFont";
-  src: url("./webfonts/Cafe24Ssurround.woff2?v=12") format("woff2");
+  src: url("./webfonts/Cafe24Ssurround.woff2?v=13") format("woff2");
   font-weight: 400 800;
   font-display: swap;
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20A0-20BF,
@@ -12,7 +12,7 @@
 }
 @font-face {
   font-family: "AppFont";
-  src: url("./webfonts/OnglipParkDahyun.woff2?v=12") format("woff2");
+  src: url("./webfonts/OnglipParkDahyun.woff2?v=13") format("woff2");
   font-weight: 400 800;
   font-display: swap;
   unicode-range: U+1100-11FF, U+3000-303F, U+3130-318F, U+AC00-D7A3;

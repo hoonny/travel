@@ -14,6 +14,7 @@ const DAYS = [
       {
         time: "22:45",
         cat: "move",
+        icon: "🚶",
         title: "상하이 푸동 국제공항 도착",
         ko: "PVG · 上海浦东国际机场",
         desc: "입국 후 'HOTEL' 표지판을 따라가면 숙소 방향.",
@@ -337,6 +338,7 @@ const DAYS = [
         time: "09:00 – 09:30",
         cat: "move",
         moveBy: "boat",
+        icon: "⛴",
         title: "방생교까지 배 이동",
         ko: "放生桥",
         desc: "1인 40위안, 방생교까지 약 20분.",
@@ -433,6 +435,7 @@ const DAYS = [
         time: "08:05",
         cat: "move",
         moveBy: "car",
+        icon: "✈️",
         title: "비행기 출발",
         ko: "상하이 푸동 → 인천",
         desc: "",

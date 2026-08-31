@@ -56,11 +56,13 @@ function overallPct() {
   return total ? Math.round((done / total) * 100) : 0;
 }
 
-function sealSVG(c) {
+const itemIcon = (it) => it.icon || (CAT[it.cat] || CAT.note).icon;
+
+function sealSVG(icon) {
   return `<svg viewBox="0 0 80 80" aria-hidden="true">
     <circle cx="40" cy="40" r="37" fill="#fff" stroke="#e0323c" stroke-width="3"/>
     <circle cx="40" cy="40" r="30.5" fill="none" stroke="#e0323c" stroke-width="1.4"/>
-    <text x="40" y="35" text-anchor="middle" font-size="21">${c.icon}</text>
+    <text x="40" y="35" text-anchor="middle" font-size="21">${icon}</text>
     <text x="40" y="55" text-anchor="middle" font-size="12" font-weight="800" fill="#e0323c">완료</text>
   </svg>`;
 }
@@ -463,7 +465,7 @@ function childHTML(k) {
   </div>`;
 }
 
-function itemHTML(dayIdx, it, mi, nextTitle) {
+function itemHTML(dayIdx, it, mi, nextTitle, nextMode) {
   if (it.type === "note") {
     return `<div class="item">
       <div class="rail"><span class="dot" style="--accent:${CAT.note.color}"></span></div>
@@ -485,13 +487,15 @@ function itemHTML(dayIdx, it, mi, nextTitle) {
   const kids = it.children?.length
     ? `<div class="children">${it.children.map(childHTML).join("")}</div>`
     : "";
+  const ic = itemIcon(it);
   const hasLoc = mi >= 0;
   const badgeNum = hasLoc ? `<span class="badge-num">${mi + 1}</span> ` : "";
   const jump = hasLoc
     ? `<div class="map-jump">${PIN}<span>지도에서 위치 보기</span></div>`
     : "";
+  const legIcon = MODE_ICON[nextMode] || "🚶";
   const leg = nextTitle
-    ? `<button type="button" class="leg-btn" data-leg="${mi}">🚶 다음 장소로 이동 <b>${esc(
+    ? `<button type="button" class="leg-btn" data-leg="${mi}">${legIcon} 다음 장소로 이동 <b>${esc(
         nextTitle
       )}</b> →</button>`
     : "";
@@ -511,7 +515,7 @@ function itemHTML(dayIdx, it, mi, nextTitle) {
   }" style="--accent:${c.color}" data-stamp="${esc(sid)}"${
     hasLoc ? ` data-mi="${mi}"` : ""
   }>
-        <span class="badge">${badgeNum}${c.icon} ${c.label}</span>
+        <span class="badge">${badgeNum}${ic} ${c.label}</span>
         <h3>${esc(it.title)}</h3>
         ${it.ko ? `<div class="ko">${esc(it.ko)}</div>` : ""}
         ${it.desc ? `<p class="desc">${esc(it.desc)}</p>` : ""}
@@ -524,7 +528,7 @@ function itemHTML(dayIdx, it, mi, nextTitle) {
           sid
         )}">🧧 도장 찍기</button>
         ${doneLine}
-        <div class="stamp-seal">${sealSVG(c)}</div>
+        <div class="stamp-seal">${sealSVG(ic)}</div>
       </div>
     </div>
   </div>`;
@@ -539,10 +543,10 @@ function renderDay(idx) {
   let n = -1;
   const rows = d.items
     .map((it) => {
-      if (!Array.isArray(it.ll)) return itemHTML(idx, it, -1, null);
+      if (!Array.isArray(it.ll)) return itemHTML(idx, it, -1, null, null);
       n += 1;
-      const next = llItems[n + 1] ? llItems[n + 1].title : null;
-      return itemHTML(idx, it, n, next);
+      const nx = llItems[n + 1];
+      return itemHTML(idx, it, n, nx ? nx.title : null, nx ? nx.moveBy : null);
     })
     .join("");
 
@@ -581,7 +585,7 @@ function renderBoard(idx) {
         on ? " on" : ""
       }" data-goto="${esc(id)}" style="--accent:${c.color}" title="${esc(
         it.title
-      )}">${on ? c.icon : ""}</button>`;
+      )}">${on ? itemIcon(it) : ""}</button>`;
     })
     .join("");
 
